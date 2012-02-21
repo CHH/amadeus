@@ -1,0 +1,121 @@
+#!/usr/bin/env php
+<?php
+
+$ARGV = $_SERVER['argv'];
+
+function println($line = "", $stream = null)
+{
+    $line .= PHP_EOL;
+
+    if (null === $stream) {
+        echo $line;
+        return;
+    }
+    fwrite($stream, $line);
+}
+
+function usage()
+{
+    return <<<EOF
+Usage:
+    amadeus <command> [<arguments>]
+
+Available Commands:
+ - build
+EOF;
+}
+
+$cmd = @$ARGV[1];
+array_shift($ARGV);
+array_shift($ARGV);
+
+switch ($cmd) {
+    case "build":
+        build();
+        break;
+    default:
+        println("Command $cmd not found.", STDERR);
+        break;
+}
+
+function build()
+{
+    global $ARGV;
+    $usage = "Usage: amadeus build <source_dir> [<version>]";
+
+    if (!$packageDir = @$ARGV[0]) {
+        println($usage, STDERR);
+        exit(1);
+    }
+
+    if (!is_file("$packageDir/composer.json")) {
+        println("build: composer.json not found in $packageDir", STDERR);
+        exit(1);
+    }
+
+    $repository = getcwd();
+    $config     = json_decode(file_get_contents("$repository/amadeus.json"), true);
+    $packages   = array();
+
+    initRepository($repository);
+
+    if (is_file("$repository/public/packages.json")) {
+        $packages = json_decode(file_get_contents("$repository/public/packages.json"), true);
+    }
+
+
+    $package  = json_decode(file_get_contents("$packageDir/composer.json"), true);
+    $version  = @$ARGV[1] ?: $package["version"];
+
+    if (!$version) {
+        println("You have to specify the version either as argument, or in the composer.json!", STDERR);
+        exit(1);
+    }
+
+    $distFile = "{$package["name"]}-$version.zip";
+
+    $package["dist"] = array(
+        "url" => $config["repository_url"] . "/get/$distFile",
+        "type" => "zip"
+    );
+
+    $package["version"] = $version;
+
+    addPackage($packages, $package);
+
+    if (!is_dir(dirname("$repository/public/get/$distFile"))) {
+        mkdir(dirname("$repository/public/get/$distFile"), 0777, true);
+    }
+
+    if (is_file("$repository/public/get/$distFile")) {
+        unlink("$repository/public/get/$distFile");
+    }
+
+    $distArchive = new PharData("$repository/public/get/$distFile", 0, "", Phar::ZIP);
+    $distArchive->buildFromDirectory($packageDir);
+
+    file_put_contents("$repository/public/packages.json", json_encode($packages));
+}
+
+function initRepository($repository)
+{
+    !is_dir("$repository/public")     and mkdir("$repository/public", 0777, true);
+    !is_dir("$repository/public/get") and mkdir("$repository/public/get", 0777, true);
+}
+
+function addPackage(&$packages, $package)
+{
+    $version = $package["version"];
+
+    if (@$packages[$package["name"]]) {
+        $packages[$package["name"]]["versions"][$version] = $package;
+    } else {
+        $packages[$package["name"]] = array(
+            "name" => $package["name"],
+            "description" => $package["description"],
+            "versions" => array(
+                $version => $package
+            )
+        );
+    }
+}
