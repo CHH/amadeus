@@ -66,17 +66,19 @@ Amadeus has some prerequisites for your packages:
    the package's source can be retrieved. Usually this is a VCS.
    This is not needed for packages on Packagist, because you tell them
    the source location when creating a package. Amadeus has no way of
-   knowing this, so you have to tell it:
+   knowing this, so you have to tell it
 
-       // composer.json
-       {
-            // ...
-            "source": {
-                "type": "git",
-                "url": "git://github.com/acme-corp/foo.git",
-                "reference": "master"
-            }
-       }
+```javascript
+// composer.json
+{
+   // ...
+   "source": {
+      "type": "git",
+      "url": "git://github.com/acme-corp/foo.git",
+      "reference": "master"
+   }
+}
+```
 
 To add a package to your repository just call:
 
